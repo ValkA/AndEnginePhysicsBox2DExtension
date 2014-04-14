@@ -1,5 +1,6 @@
 /*
-* Copyright (c) 2006-2009 Erin Catto http://www.gphysics.com
+* Copyright (c) 2006-2009 Erin Catto http://www.box2d.org
+* Copyright (c) 2013 Google, Inc.
 *
 * This software is provided 'as-is', without any express or implied
 * warranty.  In no event will the authors be held liable for any damages
@@ -19,7 +20,7 @@
 #ifndef B2_WORLD_CALLBACKS_H
 #define B2_WORLD_CALLBACKS_H
 
-#include "Box2D/Common/b2Settings.h"
+#include <Box2D/Common/b2Settings.h>
 
 struct b2Vec2;
 struct b2Transform;
@@ -27,9 +28,12 @@ class b2Fixture;
 class b2Body;
 class b2Joint;
 class b2Contact;
-struct b2ContactPoint;
+class b2ParticleSystem;
 struct b2ContactResult;
 struct b2Manifold;
+class b2ParticleGroup;
+struct b2ParticleBodyContact;
+struct b2ParticleContact;
 
 /// Joints and fixtures are destroyed when their associated
 /// body is destroyed. Implement this listener so that you
@@ -46,6 +50,23 @@ public:
 	/// Called when any fixture is about to be destroyed due
 	/// to the destruction of its parent body.
 	virtual void SayGoodbye(b2Fixture* fixture) = 0;
+
+	/// Called when any particle group is about to be destroyed.
+	virtual void SayGoodbye(b2ParticleGroup* group)
+	{
+		B2_NOT_USED(group);
+	}
+
+	/// Called when a particle is about to be destroyed.
+	/// The index can be used in conjunction with
+	/// b2ParticleSystem::GetUserDataBuffer() or
+	/// b2ParticleSystem::GetParticleHandleFromIndex() to determine which
+	/// particle has been destroyed.
+	virtual void SayGoodbye(b2ParticleSystem* particleSystem, int32 index)
+	{
+		B2_NOT_USED(particleSystem);
+		B2_NOT_USED(index);
+	}
 };
 
 /// Implement this class to provide collision filtering. In other words, you can implement
@@ -58,6 +79,31 @@ public:
 	/// Return true if contact calculations should be performed between these two shapes.
 	/// @warning for performance reasons this is only called when the AABBs begin to overlap.
 	virtual bool ShouldCollide(b2Fixture* fixtureA, b2Fixture* fixtureB);
+
+	/// Return true if contact calculations should be performed between a
+	/// fixture and particle.  This is only called if the
+	/// b2_fixtureContactListenerParticle flag is set on the particle.
+	virtual bool ShouldCollide(b2Fixture* fixture,
+							   b2ParticleSystem* particleSystem,
+							   int32 particleIndex)
+	{
+		B2_NOT_USED(fixture);
+		B2_NOT_USED(particleIndex);
+		B2_NOT_USED(particleSystem);
+		return true;
+	}
+
+	/// Return true if contact calculations should be performed between two
+	/// particles.  This is only called if the
+	/// b2_particleContactListenerParticle flag is set on the particle.
+	virtual bool ShouldCollide(b2ParticleSystem* particleSystem,
+							   int32 particleIndexA, int32 particleIndexB)
+	{
+		B2_NOT_USED(particleSystem);
+		B2_NOT_USED(particleIndexA);
+		B2_NOT_USED(particleIndexB);
+		return true;
+	}
 };
 
 /// Contact impulses for reporting. Impulses are used instead of forces because
@@ -67,6 +113,7 @@ struct b2ContactImpulse
 {
 	float32 normalImpulses[b2_maxManifoldPoints];
 	float32 tangentImpulses[b2_maxManifoldPoints];
+	int32 count;
 };
 
 /// Implement this class to get contact information. You can use these results for
@@ -88,6 +135,44 @@ public:
 
 	/// Called when two fixtures cease to touch.
 	virtual void EndContact(b2Contact* contact) { B2_NOT_USED(contact); }
+
+	/// Called when a fixture and particle start touching if the
+	/// b2_fixtureContactFilterParticle flag is set on the particle.
+	virtual void BeginContact(b2ParticleSystem* particleSystem,
+							  b2ParticleBodyContact* particleBodyContact)
+	{
+		B2_NOT_USED(particleSystem);
+		B2_NOT_USED(particleBodyContact);
+	}
+
+	/// Called when a fixture and particle stop touching if the
+	/// b2_fixtureContactFilterParticle flag is set on the particle.
+	virtual void EndContact(b2Fixture* fixture,
+							b2ParticleSystem* particleSystem, int32 index)
+	{
+		B2_NOT_USED(fixture);
+		B2_NOT_USED(particleSystem);
+		B2_NOT_USED(index);
+	}
+
+	/// Called when two particles start touching if
+	/// b2_particleContactFilterParticle flag is set on either particle.
+	virtual void BeginContact(b2ParticleSystem* particleSystem,
+							  b2ParticleContact* particleContact)
+	{
+		B2_NOT_USED(particleSystem);
+		B2_NOT_USED(particleContact);
+	}
+
+	/// Called when two particles start touching if
+	/// b2_particleContactFilterParticle flag is set on either particle.
+	virtual void EndContact(b2ParticleSystem* particleSystem,
+							int32 indexA, int32 indexB)
+	{
+		B2_NOT_USED(particleSystem);
+		B2_NOT_USED(indexA);
+		B2_NOT_USED(indexB);
+	}
 
 	/// This is called after a contact is updated. This allows you to inspect a
 	/// contact before it goes to the solver. If you are careful, you can modify the
@@ -128,6 +213,27 @@ public:
 	/// Called for each fixture found in the query AABB.
 	/// @return false to terminate the query.
 	virtual bool ReportFixture(b2Fixture* fixture) = 0;
+
+	/// Called for each particle found in the query AABB.
+	/// @return false to terminate the query.
+	virtual bool ReportParticle(const b2ParticleSystem* particleSystem,
+								int32 index)
+	{
+		B2_NOT_USED(particleSystem);
+		B2_NOT_USED(index);
+		return false;
+	}
+
+	/// Cull an entire particle system from b2World::QueryAABB. Ignored for
+	/// b2ParticleSystem::QueryAABB.
+	/// @return true if you want to include particleSystem in the AABB query,
+	/// or false to cull particleSystem from the AABB query.
+	virtual bool ShouldQueryParticleSystem(
+		const b2ParticleSystem* particleSystem)
+	{
+		B2_NOT_USED(particleSystem);
+		return true;
+	}
 };
 
 /// Callback class for ray casts.
@@ -150,68 +256,44 @@ public:
 	/// closest hit, 1 to continue
 	virtual float32 ReportFixture(	b2Fixture* fixture, const b2Vec2& point,
 									const b2Vec2& normal, float32 fraction) = 0;
-};
 
-/// Color for debug drawing. Each value has the range [0,1].
-struct b2Color
-{
-	b2Color() {}
-	b2Color(float32 r, float32 g, float32 b) : r(r), g(g), b(b) {}
-	void Set(float32 ri, float32 gi, float32 bi) { r = ri; g = gi; b = bi; }
-	float32 r, g, b;
-};
-
-/// Implement and register this class with a b2World to provide debug drawing of physics
-/// entities in your game.
-class b2DebugDraw
-{
-public:
-	b2DebugDraw();
-
-	virtual ~b2DebugDraw() {}
-
-	enum
+	/// Called for each particle found in the query. You control how the ray
+	/// cast proceeds by returning a float:
+	/// return <=0: ignore the remaining particles in this particle system
+	/// return fraction: ignore particles that are 'fraction' percent farther
+	///   along the line from 'point1' to 'point2'. Note that 'point1' and
+	///   'point2' are parameters to b2World::RayCast.
+	/// @param particleSystem the particle system containing the particle
+	/// @param index the index of the particle in particleSystem
+	/// @param point the point of intersection bt the ray and the particle
+	/// @param normal the normal vector at the point of intersection
+	/// @param fraction percent (0.0~1.0) from 'point0' to 'point1' along the
+	///   ray. Note that 'point1' and 'point2' are parameters to
+	///   b2World::RayCast.
+	/// @return <=0 to ignore rest of particle system, fraction to ignore
+	/// particles that are farther away.
+	virtual float32 ReportParticle(const b2ParticleSystem* particleSystem,
+								   int32 index, const b2Vec2& point,
+								   const b2Vec2& normal, float32 fraction)
 	{
-		e_shapeBit				= 0x0001, ///< draw shapes
-		e_jointBit				= 0x0002, ///< draw joint connections
-		e_aabbBit				= 0x0004, ///< draw axis aligned bounding boxes
-		e_pairBit				= 0x0008, ///< draw broad-phase pairs
-		e_centerOfMassBit		= 0x0010, ///< draw center of mass frame
-	};
+		B2_NOT_USED(particleSystem);
+		B2_NOT_USED(index);
+		B2_NOT_USED(&point);
+		B2_NOT_USED(&normal);
+		B2_NOT_USED(fraction);
+		return 0;
+	}
 
-	/// Set the drawing flags.
-	void SetFlags(uint32 flags);
-
-	/// Get the drawing flags.
-	uint32 GetFlags() const;
-	
-	/// Append flags to the current flags.
-	void AppendFlags(uint32 flags);
-
-	/// Clear flags from the current flags.
-	void ClearFlags(uint32 flags);
-
-	/// Draw a closed polygon provided in CCW order.
-	virtual void DrawPolygon(const b2Vec2* vertices, int32 vertexCount, const b2Color& color) = 0;
-
-	/// Draw a solid closed polygon provided in CCW order.
-	virtual void DrawSolidPolygon(const b2Vec2* vertices, int32 vertexCount, const b2Color& color) = 0;
-
-	/// Draw a circle.
-	virtual void DrawCircle(const b2Vec2& center, float32 radius, const b2Color& color) = 0;
-	
-	/// Draw a solid circle.
-	virtual void DrawSolidCircle(const b2Vec2& center, float32 radius, const b2Vec2& axis, const b2Color& color) = 0;
-	
-	/// Draw a line segment.
-	virtual void DrawSegment(const b2Vec2& p1, const b2Vec2& p2, const b2Color& color) = 0;
-
-	/// Draw a transform. Choose your own length scale.
-	/// @param xf a transform.
-	virtual void DrawTransform(const b2Transform& xf) = 0;
-
-protected:
-	uint32 m_drawFlags;
+	/// Cull an entire particle system from b2World::RayCast. Ignored in
+	/// b2ParticleSystem::RayCast.
+	/// @return true if you want to include particleSystem in the RayCast, or
+	/// false to cull particleSystem from the RayCast.
+	virtual bool ShouldQueryParticleSystem(
+		const b2ParticleSystem* particleSystem)
+	{
+		B2_NOT_USED(particleSystem);
+		return true;
+	}
 };
 
 #endif

@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2006-2009 Erin Catto http://www.gphysics.com
+* Copyright (c) 2006-2009 Erin Catto http://www.box2d.org
 *
 * This software is provided 'as-is', without any express or implied
 * warranty.  In no event will the authors be held liable for any damages
@@ -16,8 +16,9 @@
 * 3. This notice may not be removed or altered from any source distribution.
 */
 
-#include "Box2D/Common/b2StackAllocator.h"
-#include "Box2D/Common/b2Math.h"
+#include <Box2D/Common/b2StackAllocator.h>
+#include <Box2D/Common/b2Math.h>
+#include <string.h>
 
 b2StackAllocator::b2StackAllocator()
 {
@@ -54,6 +55,42 @@ void* b2StackAllocator::Allocate(int32 size)
 	m_allocation += size;
 	m_maxAllocation = b2Max(m_maxAllocation, m_allocation);
 	++m_entryCount;
+
+	return entry->data;
+}
+
+void* b2StackAllocator::Reallocate(void* p, int32 size)
+{
+	b2Assert(m_entryCount > 0);
+	b2StackEntry* entry = m_entries + m_entryCount - 1;
+	b2Assert(p == entry->data);
+	B2_NOT_USED(p);
+	int32 incrementSize = size - entry->size;
+	if (incrementSize > 0)
+	{
+		if (entry->usedMalloc)
+		{
+			void* data = b2Alloc(size);
+			memcpy(data, entry->data, entry->size);
+			b2Free(entry->data);
+			entry->data = (char*)data;
+		}
+		else if (m_index + incrementSize > b2_stackSize)
+		{
+			void* data = b2Alloc(size);
+			memcpy(data, entry->data, entry->size);
+			m_index -= entry->size;
+			entry->data = (char*)data;
+			entry->usedMalloc = true;
+		}
+		else
+		{
+			m_index += incrementSize;
+			m_allocation += incrementSize;
+			m_maxAllocation = b2Max(m_maxAllocation, m_allocation);
+		}
+		entry->size = size;
+	}
 
 	return entry->data;
 }
